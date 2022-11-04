@@ -1,0 +1,343 @@
+<html>
+    <head>
+    <style>
+        body, html {
+  margin: 0;
+  font-family: "helvetica neue", helvetica, arial, sans-serif;
+  font-size: 14px;
+}
+
+audio {
+  position: relative;
+  display: block;
+  width: 320px;
+  margin: 15px auto;
+}
+
+.beat-selector-container {
+  visibility: hidden;
+  margin: 10px auto;
+  width: 320px;
+  background: #fff;
+  height: 55px;
+  position: relative;
+}
+.beat-selector-container .information {
+  height: 50px;
+  width: 100%;
+  position: relative;
+}
+.beat-selector-container .information .beat-info, .beat-selector-container .information .second-info {
+  width: 158px;
+  color: #9197B3;
+  position: relative;
+  display: inline-block;
+  text-align: center;
+  padding-top: 3px;
+}
+.beat-selector-container .resizer-container {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  display: block;
+  width: 320px;
+  height: 20px;
+  background: white;
+}
+.beat-selector-container .resizer {
+  background: #20295C;
+  width: 320px;
+  height: 20px;
+  position: relative;
+  display: block;
+  text-align: center;
+}
+.beat-selector-container .resizer p.info {
+  color: white;
+  font-size: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0;
+  padding: 2px 0 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.beat-selector-container .resizer i {
+  position: absolute;
+  top: 3px;
+  color: white;
+}
+.beat-selector-container .resizer i.fi-arrow-left {
+  left: 4px;
+}
+.beat-selector-container .resizer i.fi-arrow-right {
+  right: 4px;
+}
+.beat-selector-container .resizer .edge {
+  position: absolute;
+  width: 2px;
+  height: 20px;
+  margin: 0;
+  top: 0;
+  background: #68C9FF;
+}
+.beat-selector-container .resizer .edge.left {
+  left: 0;
+}
+.beat-selector-container .resizer .edge.right {
+  right: 0;
+}
+.beat-selector-container .markers {
+  width: 320px;
+  position: relative;
+  height: 50px;
+  margin: 0;
+  padding: 0;
+}
+.beat-selector-container .markers .marker {
+  width: 1px;
+  height: 40px;
+  position: absolute;
+  top: 10px;
+  background: #68C9FF;
+}
+.beat-selector-container .markers .marker.tall {
+  height: 47px;
+  top: 2px;
+}
+
+.settings {
+  /* visibility: hidden; */
+  margin: 10px auto;
+  width: 400px;
+  text-align: center;
+}
+.settings input {
+  width: 25px;
+  margin-right: 10px;
+}
+.settings input, .settings label {
+  display: inline-block;
+}
+.settings button {
+  background: green;
+  color: white;
+  padding: 5px 10px;
+  border: 0;
+  cursor: pointer;
+}
+    </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+</head>
+<body>
+    <audio controls='' id='player' preload='auto'>
+        <source src='https://nudgeprod.blob.core.windows.net/playbook/presales/audio/playbook_1652193002327.wav' type='audio/mp3'>
+      </audio>
+      <div class='beat-selector-container'>
+        <div class='information'>
+          <div class='beat-info'></div>
+          <div class='second-info'></div>
+        </div>
+        <div class='markers'></div>
+        <div class='resizer-container'></div>
+      </div>
+
+      <div class='settings' style="margin-top: 6%;">
+        <label for='measures'>Measures</label>
+        <input id='measures'  type='text' value='8'>
+        <label for='beats'>Beats/measure</label>
+        <input id='beats'  type='text' value='4'>
+        <label for='bpm'>BPM</label>
+        <input id='bpm'  type='text' value='200'>
+        <button>SET</button>
+      </div>
+      
+      
+
+      <script>
+       function setMarkers(obj) {
+  obj.container.css({ visibility: "visible" });
+  let totalBeats = obj.measures * obj.bpMeasure,
+    WD = obj.container.width(),
+    markers = obj.container.find(".markers")[0],
+    spacer = WD / totalBeats;
+  markers.innerHTML = "";
+  for (let measure = 0; measure < obj.measures; measure++) {
+    let tall = document.createElement("div");
+    tall.className = "marker tall";
+    let startMeasure = measure * (obj.bpMeasure * spacer);
+    tall.style.left = `${startMeasure}px`;
+    markers.appendChild(tall);
+    for (let beat = 1; beat < obj.bpMeasure; beat++) {
+      let marker = document.createElement("div");
+      marker.className = "marker";
+      marker.style.left = `${beat * spacer + startMeasure}px`;
+      markers.appendChild(marker);
+    }
+  }
+  setResizer({
+    snap: spacer,
+    resizeContainer: obj.container.find(".resizer-container"),
+    bpMeasure: obj.bpMeasure,
+    measures: obj.measures,
+    bpm: obj.bpm,
+    totalBeats: totalBeats,
+    width: WD,
+    player: obj.player
+  });
+}
+
+function setResizer(obj) {
+  removeOldResizer(obj.resizeContainer);
+
+  let resizeElements = newResizerBox(obj.resizeContainer[0]),
+    snap = obj.snap,
+    measures = obj.measures,
+    bpMeasure = obj.bpMeasure,
+    bpm = obj.bpm,
+    totalBeats = obj.totalBeats,
+    WD = obj.width,
+    player = obj.player,
+    beatInfo = $(".information .beat-info")[0],
+    secondInfo = $(".information .second-info")[0];
+
+  let resizeBox = resizeElements.resizer,
+    infoBox = resizeElements.info,
+    icons = $(resizeBox).find("i");
+
+  $(resizeBox).resizable({
+    grid: obj.snap,
+    handles: "e, w",
+    containment: obj.resizeContainer,
+    create: function (ui, event) {},
+    start: function (ui, event) {
+      forceHeight(ui);
+      secondInfo.innerHTML = "";
+    },
+    resize: function (ui, event) {
+      forceHeight(ui);
+      let startBeat = event.position.left / snap;
+      let endBeat = event.size.width / snap + startBeat;
+      beatInfo.innerHTML = `Beat ${startBeat}-${endBeat} of ${totalBeats}`;
+      if (event.size.width < 120) {
+        $(infoBox).hide();
+      } else {
+        $(infoBox).show();
+      }
+      if (event.size.width < 30) {
+        icons.hide();
+      } else {
+        icons.show();
+      }
+    },
+    stop: function (ui, event) {
+      forceHeight(ui);
+      let startBeat = event.position.left / snap,
+        endBeat = event.size.width / snap + startBeat,
+        bps = 60 / bpm,
+        spm = bpMeasure * bps;
+
+      beatInfo.innerHTML = `Beat ${startBeat}-${endBeat} of ${totalBeats}`;
+      let startTime = startBeat * bps;
+      let endTime = endBeat * bps;
+      let frame = 1 / 25;
+      secondInfo.innerHTML = `Total Seconds: ${parseFloat(
+        (endTime - startTime).toFixed(3)
+      )}`;
+      player.currentTime = startTime;
+      player.ontimeupdate = function () {
+        console.log(player.currentTime);
+        if (player.currentTime >= endTime - frame * 4) {
+          player.pause();
+          player.currentTime = startTime;
+        }
+      };
+    }
+  });
+}
+
+function forceHeight(ui) {
+  // hack to keep jquery ui from screwing up the height and offset, etc
+  $(ui.target).height(20);
+  $(ui.target).css({ top: 0 });
+}
+
+function removeOldResizer(resizeContainer) {
+  if (resizeContainer.find(".resizer").length > 0) {
+    resizeContainer.find(".resizer").resizable("destroy");
+    resizeContainer.find(".resizer").remove();
+  }
+}
+
+function newResizerBox(resizeContainer) {
+  let resizer = document.createElement("div");
+  resizer.className = "resizer";
+  let leftEdge = document.createElement("div");
+  leftEdge.className = "left edge";
+  let rightEdge = document.createElement("div");
+  rightEdge.className = "right edge";
+  let leftArrow = document.createElement("i");
+  leftArrow.className = "fi-arrow-left";
+  let rightArrow = document.createElement("i");
+  rightArrow.className = "fi-arrow-right";
+  let info = document.createElement("p");
+  info.className = "info";
+  info.innerHTML = "Drag Edges";
+  resizer.appendChild(leftEdge);
+  resizer.appendChild(leftArrow);
+  resizer.appendChild(info);
+  resizer.appendChild(rightArrow);
+  resizer.appendChild(rightEdge);
+  resizeContainer.appendChild(resizer);
+  return { resizer: resizer, info: info };
+}
+
+// $('button').on('click', function(){
+let M = parseInt($("input#measures").val());
+let B = parseInt($("input#beats").val());
+let bpm = parseInt($("input#bpm").val());
+let player = document.querySelector("audio#player");
+
+setMarkers({
+  measures: M,
+  bpMeasure: B,
+  bpm: bpm,
+  container: $(".beat-selector-container"),
+  player: player
+});
+// });
+
+// Request URL of the Audio File
+var mp3file = "https://nudgeprod.blob.core.windows.net/playbook/presales/audio/playbook_1652193002327.wav";
+
+// Create an instance of AudioContext
+var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// Open an Http Request
+var request = new XMLHttpRequest();
+request.open('GET', mp3file, true);
+request.responseType = 'arraybuffer';
+request.onload = function() {
+    audioContext.decodeAudioData(request.response, function(buffer) {
+        // Obtain the duration in seconds of the audio file (with milliseconds as well, a float value)
+        var duration = buffer.duration;
+
+        // example 12.3234 seconds
+        console.log("The duration of the song is of: " + duration + " seconds");
+        // Alternatively, just display the integer value with
+        // parseInt(duration)
+        // 12 seconds
+    });
+};
+
+// Start Request
+request.send();
+
+
+      </script>
+</body>     
+ 
+</html>

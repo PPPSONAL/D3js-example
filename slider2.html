@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<style>
+    canvas {
+  width: 100%;
+  height: 130px;
+  background: #f9f9f9;
+  margin: 2rem auto;
+  box-shadow: inset 0px 0px 25px -15px #000;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.wrapper {
+  padding: 2rem;
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <input id="fileinput" type="file" accept="audio/mp3,audio/wav,video/mp4"/>
+  <div style="display: flex;justify-content: center;align-items: center;column-gap: 20px;">
+        <div><b>Start point: </b> <span id="startpoint"></span></div>
+        <div><b>End point: </b> <span id="endpoint"></span></div>
+        <div><b>Total duration: </b> <span id="totalduration"></span></div>
+    </div>
+  <canvas id="canvas"></canvas>
+  <div id="slider" style="position: absolute;top: 110px;"></div>
+  <audio id="audio" src="" controls="true"></audio>
+</div>
+<script>
+    drawSlider()
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+class renderWave {
+    _samples = 10000;
+    _strokeStyle = "#68C9FF";
+
+  constructor(message) {
+    this.audioContext = new AudioContext();
+    this.canvas = document.querySelector("canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.data = [];
+    message
+      .then(arrayBuffer => {
+        return this.audioContext.decodeAudioData(arrayBuffer);
+      })
+      .then(audioBuffer => {
+        this.draw(this.normalizedData(audioBuffer));
+        this.drawData(this.data);
+      });
+  }
+
+  normalizedData(audioBuffer) {
+    const rawData = audioBuffer.getChannelData(0); // We only need to work with one channel of data
+    const samples = this._samples; // Number of samples we want to have in our final data set
+    const blockSize = Math.floor(rawData.length / samples); // Number of samples in each subdivision
+    const filteredData = [];
+    for (let i = 0; i < samples; i++) {
+      filteredData.push(rawData[i * blockSize]);
+    }
+    return filteredData;
+  }
+
+  draw(normalizedData) {
+    // set up the canvas
+    const canvas = this.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const padding = 10;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = (canvas.offsetHeight + padding * 2) * dpr;
+    this.ctx.scale(dpr, dpr);
+    this.ctx.translate(0, canvas.offsetHeight / 2 + padding); // set Y = 0 to be in the middle of the canvas
+
+    // draw the line segments
+    const width = canvas.offsetWidth / normalizedData.length;
+    console.log(width)
+    for (let i = 0; i < normalizedData.length; i++) {
+      const x = width * i;
+      let height = normalizedData[i] * canvas.offsetHeight - padding;
+      if (height < 0) {
+        height = 0;
+      } else if (height > canvas.offsetHeight / 2) {
+        height = height > canvas.offsetHeight / 2;
+      }
+      // this.drawLineSegment(this.ctx, x, height, width, (i + 1) % 2);
+      this.data.push({
+        x: x,
+        h: height,
+        w: width,
+        isEven: (i + 1) % 2
+      });
+    }
+    return this.data;
+  }
+
+  drawLineSegment(
+    ctx,
+    x,
+    height,
+    width,
+    isEven,
+    colors = this._strokeStyle
+  ) {
+    ctx.lineWidth = 1; // how thick the line is
+    ctx.strokeStyle = colors; // what color our line is
+    ctx.beginPath();
+    height = isEven ? height : -height;
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x + width, height);
+    ctx.stroke();
+  }
+
+  drawData(data, colors = this._strokeStyle) {
+    data.map(item => {
+      this.drawLineSegment(
+        this.ctx,
+        item.x,
+        item.h,
+        item.w,
+        item.isEven,
+        colors
+      );
+    });
+  }
+
+  drawTimeline(percent) {
+    let end = Math.ceil(this._samples * percent);
+    let start = end - 5 || 0;
+    let t = this.data.slice(0, end);
+    this.drawData(t, "#323A6A");
+  }
+}
+
+// var myAudio = document.getElementById('audio');
+
+// var bufferedTimeRanges = myAudio.buffered;
+// var wave = new renderWave(bufferedTimeRanges);
+
+document.getElementById("fileinput").addEventListener("change", function() {
+  var wave = new renderWave(this.files[0].arrayBuffer());
+  var audioPlayer = document.getElementById("audio");
+  audioPlayer.src = URL.createObjectURL(this.files[0]);
+  // audioPlayer.play();
+  audioPlayer.ontimeupdate = function() {
+    console.log(this.currentTime)
+    console.log(this.duration)
+    let percent = this.currentTime / this.duration;
+    wave.drawTimeline(percent);
+    var margin = {
+        top: 10,
+        right: 50,
+        bottom: 40,
+        left: 50
+    };
+  };
+});
+
+function drawSlider(){
+    var margin = {
+  top: 10,
+  right: 50,
+  bottom: 60,
+  left: 50
+};
+let width = 1269;
+let height = 200 - margin.top - margin.bottom;
+var xScale = d3
+  .scaleLinear()
+  .domain([0, 227]) // input
+  .range([0, width]); // output
+
+var brushXScale = d3
+  .scaleLinear()
+  .domain([0, 227]) // input
+  .range([0, width]); // output
+
+var brush = d3.brushX().extent([
+  [0, 0],
+  [width, height],
+]).on("brush", brushed);
+
+function brushed(d) {
+  var selectionPx = d3.brushSelection(this); // === [lower, upper] in pixels
+  
+  // transform from pixels to x-values
+  var selectionX = [xScale.invert(selectionPx[0]), xScale.invert(selectionPx[1])];
+    console.log(selectionX) 
+    document.getElementById("startpoint").innerHTML = parseInt(selectionX[0]).toFixed(2)
+    document.getElementById("endpoint").innerHTML = parseInt(selectionX[1]).toFixed(2)
+    document.getElementById("totalduration").innerHTML =  parseInt(parseInt(selectionX[1]) - parseInt(selectionX[0])).toFixed(2)
+  // set x scale domain, then redraw the lines
+  brushXScale.domain(selectionX);
+}
+
+//Generate the brush focus chart
+generateMinimap();
+
+function generateMinimap() {
+  var yScale = d3
+    .scaleLinear()
+    // .domain([0, d3.max(data)]) // input
+    .range([height, 0]); // output
+
+
+  var svg = d3
+    .select("#slider")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height + margin.top + margin.bottom )
+    .append("g")
+    // .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  svg.append("g").call(brush);
+
+  svg
+    .append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(xScale)); // Create an axis component with d3.axisBottom
+}
+}
+
+</script>
+</body>
+</html>

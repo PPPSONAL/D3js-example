@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src=
+"https://d3js.org/d3.v4.min.js">
+</script>
+</head>
+<body>
+
+<div id="minimap"></div>
+
+<script>
+
+
+var margin = {
+  top: 10,
+  right: 50,
+  bottom: 40,
+  left: 50
+};
+var width = window.innerWidth - margin.left - margin.right;
+var height = 200 - margin.top - margin.bottom;
+
+var xScale = d3
+  .scaleLinear()
+  .domain([0, 663]) // input
+  .range([0, width]); // output
+
+var brushXScale = d3
+  .scaleLinear()
+  .domain([0, 663]) // input
+  .range([0, width]); // output
+
+var brush = d3.brushX().extent([
+  [0, 0],
+  [width - margin.right, height],
+]).on("brush", brushed);
+
+function brushed(d) {
+  var selectionPx = d3.brushSelection(this); // === [lower, upper] in pixels
+  
+  // transform from pixels to x-values
+  var selectionX = [xScale.invert(selectionPx[0]), xScale.invert(selectionPx[1])];
+  
+  // set x scale domain, then redraw the lines
+  brushXScale.domain(selectionX);
+}
+
+//Generate the brush focus chart
+generateMinimap();
+
+function generateMinimap() {
+  var yScale = d3
+    .scaleLinear()
+    // .domain([0, d3.max(data)]) // input
+    .range([height, 0]); // output
+
+
+  var svg = d3
+    .select("#minimap")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  svg.append("g").call(brush);
+
+  svg
+    .append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(xScale)); // Create an axis component with d3.axisBottom
+}
+</script>
+</body>
+</html>
